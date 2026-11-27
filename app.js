@@ -208,7 +208,7 @@ Rules:
     html: `
     <section class="hero"><canvas id="sky" aria-hidden="true"></canvas><span class="glow a"></span><span class="glow b"></span><div class="wrap">
       <div><span class="pill">${B.name} · ${B.tagline}</span>
-        <h1>AI-powered <span class="hl">personalised learning</span> for every student</h1>
+        <h1 class="words">${["AI-powered", '<span class="hl">personalised</span>', '<span class="hl">learning</span>', "for", "every", "student"].map((w, i) => `<span class="w" style="--i:${i}">${w}</span>`).join(" ")}</h1>
         <p class="lead">A patient AI tutor, hands-on virtual labs and chapter-wise lessons that follow your syllabus and move at your pace.</p>
         <div class="ctas"><a class="btn btn-blue" href="#book-demo">${ic("cal")} Book a Free Demo</a><a class="btn btn-ghost" href="#programmes">Explore Programmes ${ic("arrow")}</a></div>
         <div class="facts"><span>${ic("book")} CBSE · ICSE · IB · Cambridge</span><span>${ic("cap")} Classes 5–12</span><span>${ic("lang")} English, Hindi and Hinglish</span></div></div>
@@ -226,13 +226,16 @@ Rules:
 
     <section><div class="wrap"><div class="statstrip">${(() => { const st = NS.stats(); return [[st.boards, "", "boards"], [st.classes, "", "classes (5–12)"], [st.subjects, "", "subject courses"], [st.chapters, "", "chapters"], [st.lectures, "+", "AI lectures"], [st.labs, "", "interactive labs"]].map(([n, suf, l]) => `<div class="sc"><b data-count="${n}" data-suffix="${suf}">0</b><span>${l}</span></div>`).join(""); })()}</div></div></section>
 
+    <section class="ribbons" aria-hidden="true">${[["CBSE", "ICSE", "IB", "Cambridge", "Classes 5–12", "English", "Hindi", "Hinglish", "AI Tutor", "Mock exams", "Revision plans", "Parent reports"], NS.LABS.map(l => l.name)].map((row, k) => `<div class="rib r${k + 1}"><div class="rtrack">${[...row, ...row].map((w, i) => `<span class="${i % 2 ? "o" : ""}">${esc(w)}</span><i>✦</i>`).join("")}</div></div>`).join("")}</section>
+
     <section class="band" id="path"><div class="wrap">${sec("Find your path", "Start with your board and class", "Pick a board and a class, and your subjects appear.")}<div id="pathbox"></div></div></section>
 
-    <section class="band alt"><div class="wrap">${sec("Why " + B.name, "Learning that fits each student")}
-      <div class="grid g3">${NS.WHY.map(([t, d, i, c], n) => `<div class="card feat" style="--c:${c}"><span class="num">0${n + 1}</span><span class="ic">${ic(i)}</span><h3>${t}</h3><p>${d}</p><svg class="ghost" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5">${I[i]}</svg></div>`).join("")}</div></div></section>
+    <section class="deck"><div class="decksticky"><div class="wrap">${sec("Why " + B.name, "Learning that fits each student", "Six reasons families switch — flying in as you scroll.")}
+      <div class="grid g3 deckgrid">${NS.WHY.map(([t, d, i, c], n) => `<div class="card feat" style="--c:${c}"><span class="num">0${n + 1}</span><span class="ic">${ic(i)}</span><h3>${t}</h3><p>${d}</p><svg class="ghost" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5">${I[i]}</svg></div>`).join("")}</div></div></div></section>
 
-    <section class="band"><div class="wrap">${sec("Our AI tutor's approach", "How your Personal Tutor helps ideas stick", "Every explanation is built from the same five blocks.")}
-      <div class="blocks">${NS.BLOCKS.map(([t, d], i) => `<div class="block"><small>BLOCK ${i + 1}</small><h3>${t}</h3><p>${d}</p><div class="bar"><i style="width:${(i + 1) * 20}%"></i></div></div>`).join("")}</div></div></section>
+    <section class="hs"><div class="hsticky"><div class="wrap">${sec("Our AI tutor's approach", "How your Personal Tutor helps ideas stick", "Every explanation is built from the same five blocks. Keep scrolling to walk through them.")}</div>
+      <div class="htrack">${NS.BLOCKS.map(([t, d], i) => `<div class="block hcard"><span class="bign">0${i + 1}</span><span class="avatar" style="width:52px;height:52px;color:var(--or)">${ic(["book", "bulb", "gauge", "layers", "check"][i])}</span><small>BLOCK ${i + 1}</small><h3>${t}</h3><p>${d}</p><div class="bar"><i style="width:${(i + 1) * 20}%"></i></div></div>`).join("")}</div>
+      <div class="wrap"><div class="hprog"><i></i></div></div></div></section>
 
     <section class="band alt" id="try-labs"><div class="wrap">${sec("Working labs", "Don't just read it. Try it.", "Real simulations that respond to every change. Try one now.")}
       <div class="labbar"><div class="tabs" id="labtabs" role="tablist">${[["pendulum", "Pendulum"], ["lens", "Lens"], ["magnet", "Magnet"]].map(([id, t], i) => `<button role="tab" data-lab="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div><a class="btn btn-ghost btn-sm" id="openfull" href="#lab-pendulum">Open full lab ${ic("arrow")}</a></div>
@@ -281,6 +284,7 @@ Rules:
       const tick = () => { if (!document.body.contains(qEl)) return; k = (k + 1) % qa.length; qEl.textContent = qa[k][0]; aEl.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>'; setTimeout(() => { if (!document.body.contains(aEl)) return; aEl.innerHTML = `<b>${esc(qa[k][1])}</b>${esc(qa[k][2])}`; }, 1300); };
       const iv = setInterval(tick, 4500); onLeave(() => clearInterval(iv));
       if (NS.mountHomeFx) { const off = NS.mountHomeFx(app, id => { location.hash = "lab-" + id; }); onLeave(off); }
+      if (NS.mountScene3D) { const off3 = NS.mountScene3D(); onLeave(off3); }
     }
   });
 

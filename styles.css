@@ -426,3 +426,53 @@ footer .icon{width:15px;height:15px;vertical-align:-3px;margin-right:4px}
 @media(prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none}.ringsec{height:auto}.ringsticky{position:relative;top:0;height:auto;padding:40px 0}.mgmt{height:auto}.mgsticky{position:relative;height:auto}}
 html{overflow-x:clip}
 .mgmt,.ringsec{overflow-x:clip}
+
+/* ===== WebGL journey + 3D scroll sections ===== */
+.scene3d{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;transition:opacity .4s}
+#app,footer{position:relative;z-index:1}
+.has3d .hero #sky{display:none}
+.has3d .orbit svg.ring{opacity:0}
+.has3d .chatcard{background:rgba(22,25,34,.62);backdrop-filter:blur(10px) saturate(1.2);-webkit-backdrop-filter:blur(10px) saturate(1.2)}
+.has3d .hero{background:radial-gradient(700px 420px at 0% 0%,rgba(150,40,60,.22),transparent 60%)}
+.has3d .glow{opacity:.18}
+.has3d .band.alt{background:rgba(10,14,24,.35)}
+
+.words .w{display:inline-block;transform-origin:50% 100%;animation:wordIn 1s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i) * 110ms + 150ms)}
+@keyframes wordIn{from{opacity:0;transform:perspective(600px) translateY(40px) rotateX(-85deg)}to{opacity:1;transform:none}}
+.hero .pill,.hero .lead,.hero .ctas,.hero .facts{animation:fadeUp .9s cubic-bezier(.2,.8,.2,1) both}
+.hero .lead{animation-delay:.75s}.hero .ctas{animation-delay:.9s}.hero .facts{animation-delay:1.05s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.orbit{animation:orbitIn 1.4s cubic-bezier(.2,.8,.2,1) .2s both}
+@keyframes orbitIn{from{opacity:0;transform:perspective(1000px) rotateY(-40deg) scale(.8)}}
+
+.ribbons{position:relative;padding:70px 0 40px;perspective:900px;overflow:hidden}
+.rib{white-space:nowrap;padding:14px 0;border-block:1px solid rgba(255,255,255,.08);background:linear-gradient(90deg,rgba(255,144,77,.1),rgba(111,163,214,.1));backdrop-filter:blur(4px)}
+.rib.r1{transform:rotateX(16deg) rotateZ(-2.5deg) skewX(var(--skew,0deg));margin:0 -40px}
+.rib.r2{transform:rotateX(-12deg) rotateZ(2deg) skewX(var(--skew,0deg));margin:-6px -40px 0;background:linear-gradient(90deg,rgba(111,163,214,.12),rgba(255,144,77,.08))}
+.rtrack{display:inline-flex;align-items:center;gap:28px;animation:marquee 46s linear infinite;padding-left:28px}
+.r2 .rtrack{animation-direction:reverse;animation-duration:60s}
+.rtrack span{font:800 clamp(22px,3.4vw,42px)/1 var(--hf);color:#fff;letter-spacing:-.01em}
+.rtrack span.o{color:transparent;-webkit-text-stroke:1.4px rgba(255,255,255,.55)}
+.rtrack i{font-style:normal;color:var(--or);font-size:20px}
+@keyframes marquee{to{transform:translateX(-50%)}}
+
+.deck{height:230vh;position:relative}
+.decksticky{position:sticky;top:70px;min-height:calc(100vh - 70px);display:flex;align-items:center;padding:30px 0}
+.decksticky .wrap{width:100%}
+.deckgrid > *{will-change:transform,opacity;transform-style:preserve-3d}
+.deckgrid .feat{background:linear-gradient(160deg,rgba(32,35,46,.92),rgba(24,26,34,.92));backdrop-filter:blur(6px)}
+@media(max-width:860px){.deck{height:auto}.decksticky{position:relative;top:0;min-height:0;padding:60px 0}}
+
+.hs{position:relative;height:300vh}
+.hsticky{position:sticky;top:70px;height:calc(100vh - 70px);display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.htrack{display:flex;gap:28px;padding:10px max(8vw,24px) 30px;width:max-content;will-change:transform}
+.hcard{width:min(380px,78vw);min-height:300px;flex:none;padding:28px;transform-style:preserve-3d;transition:border-color .3s,box-shadow .3s;background:linear-gradient(170deg,rgba(36,40,54,.95),rgba(24,26,34,.95))}
+.hcard .bign{position:absolute;right:20px;top:6px;font:900 84px/1 var(--hf);color:transparent;-webkit-text-stroke:1.5px rgba(255,144,77,.35)}
+.hcard .avatar{margin-bottom:18px}
+.hcard h3{font-size:22px;margin:10px 0}
+.hcard p{font-size:15px}
+.hcard.focus{border-color:var(--or);box-shadow:0 30px 70px rgba(255,144,77,.18)}
+.hprog{height:4px;border-radius:4px;background:var(--line);overflow:hidden;max-width:420px;margin:6px auto 0}
+.hprog i{display:block;height:100%;background:linear-gradient(90deg,var(--or),var(--bl));transform-origin:0 50%;transform:scaleX(0)}
+[data-reveal].head:not(.in){transform:perspective(700px) translateZ(-260px) rotateX(28deg)}
+@media(prefers-reduced-motion:reduce){.words .w,.hero .pill,.hero .lead,.hero .ctas,.hero .facts,.orbit{animation:none}.rtrack{animation:none}.hs{height:auto}.hsticky{position:relative;height:auto;padding:40px 0}.htrack{flex-wrap:wrap;width:auto;justify-content:center}.deck{height:auto}.decksticky{position:relative}}

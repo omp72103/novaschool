@@ -23,7 +23,7 @@
     const reduce = RM();
 
     /* ---------- reveals ---------- */
-    const auto = root.querySelectorAll(".head, .grid > *, .blocks > *, .path > *, .duo > *, .steps > *, .faq details, .statstrip > *, .cta, .labbar, #labhost, .mgmt-copy > *");
+    const auto = [...root.querySelectorAll(".head, .grid > *, .path > *, .duo > *, .steps > *, .faq details, .statstrip > *, .cta, .labbar, #labhost, .mgmt-copy > *")].filter(el => !el.closest(".deckgrid, .htrack"));
     auto.forEach(el => { if (el.hasAttribute("data-reveal")) return; el.setAttribute("data-reveal", ""); const i = [...el.parentNode.children].indexOf(el); el.style.setProperty("--d", (Math.min(i, 8) * 70) + "ms"); });
     const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const t = e.target; t.classList.add("in"); io.unobserve(t); setTimeout(() => { t.removeAttribute("data-reveal"); t.classList.remove("in"); }, 1500); } }), { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
     root.querySelectorAll("[data-reveal]").forEach(el => reduce ? el.classList.add("in") : io.observe(el));
@@ -39,7 +39,7 @@
     root.querySelectorAll("[data-count]").forEach(el => cio.observe(el)); offs.push(() => cio.disconnect());
 
     /* ---------- 3D tilt cards ---------- */
-    if (!reduce && matchMedia("(hover:hover)").matches) root.querySelectorAll(".feat, .labcard, .block, .stp, .mcard").forEach(el => {
+    if (!reduce && matchMedia("(hover:hover)").matches) root.querySelectorAll(".labcard, .stp, .post, .story").forEach(el => {
       el.classList.add("tilt");
       on(el, "pointermove", e => { const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height; el.style.setProperty("--rx", ((0.5 - y) * 10).toFixed(2) + "deg"); el.style.setProperty("--ry", ((x - 0.5) * 12).toFixed(2) + "deg"); el.style.setProperty("--gx", (x * 100).toFixed(1) + "%"); el.style.setProperty("--gy", (y * 100).toFixed(1) + "%"); });
       on(el, "pointerleave", () => { el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); });
@@ -99,6 +99,14 @@
     let mgForced = null;
     copies.forEach((c, i) => on(c, "click", () => { mgForced = i; const r = mg.getBoundingClientRect(), total = mg.offsetHeight - innerHeight; if (total > 0 && !reduce) scrollTo({ top: scrollY + r.top + total * (i + .5) / screens.length, behavior: "smooth" }); else update(); }));
 
+    /* ---------- flying feature deck ---------- */
+    const deck = root.querySelector(".deck"), deckCards = deck ? [...deck.querySelectorAll(".deckgrid > *")] : [];
+    /* ---------- horizontal cover-flow ---------- */
+    const hs = root.querySelector(".hs"), track = hs ? hs.querySelector(".htrack") : null, hcards = track ? [...track.children] : [], hbar = hs ? hs.querySelector(".hprog i") : null;
+    const sizeHs = () => { if (!hs || !track) return; const extra = Math.max(0, track.scrollWidth - innerWidth); hs.style.height = (reduce ? "auto" : (innerHeight + extra + innerHeight * 0.3) + "px"); };
+    sizeHs(); on(window, "resize", sizeHs);
+    /* ---------- ribbons: speed up with scroll velocity ---------- */
+    const ribs = [...root.querySelectorAll(".rib")]; let lastY = scrollY, vel = 0;
     /* ---------- timeline ---------- */
     const tl = root.querySelector(".timeline");
 
@@ -115,6 +123,18 @@
         screens.forEach((s, i) => { const d = i - f, a = Math.abs(d); s.style.transform = `translate3d(${d * 34}%, ${a * 6}%, ${-a * 260}px) rotateY(${clamp(-d * 32, -60, 60)}deg)`; s.style.opacity = clamp(1 - a * .55, 0, 1); s.style.zIndex = 10 - Math.round(a * 3); });
         const act = clamp(Math.round(f), 0, screens.length - 1); copies.forEach((c, i) => c.classList.toggle("on", i === act));
       }
+      const big = innerWidth > 860;
+      if (deck && deckCards.length) {
+        if (reduce || !big) deckCards.forEach(c => { c.style.transform = ""; c.style.opacity = ""; });
+        else { const p = prog(deck); deckCards.forEach((c, i) => { const li = clamp((p * 1.5 - i * 0.12) / 0.4, 0, 1), k = 1 - li, e = 1 - Math.pow(k, 3); c.style.transform = `perspective(1100px) translate3d(${(i % 3 - 1) * k * 160}px, ${k * 140}px, ${-k * 1400}px) rotateX(${k * 55}deg) rotateY(${(i % 3 - 1) * k * -40}deg) rotateZ(${(i % 2 ? 1 : -1) * k * 14}deg)`; c.style.opacity = e.toFixed(3); }); }
+      }
+      if (hs && track && !reduce) {
+        const p = prog(hs), extra = Math.max(0, track.scrollWidth - innerWidth);
+        track.style.transform = `translate3d(${-p * extra}px,0,0)`;
+        if (hbar) hbar.style.transform = `scaleX(${p})`;
+        hcards.forEach(c => { const r = c.getBoundingClientRect(), d = clamp(((r.left + r.width / 2) - innerWidth / 2) / innerWidth, -1, 1); c.style.transform = `perspective(1000px) rotateY(${(-d * 38).toFixed(2)}deg) translateZ(${(-Math.abs(d) * 160).toFixed(1)}px) scale(${(1 - Math.abs(d) * 0.08).toFixed(3)})`; c.style.opacity = (1 - Math.abs(d) * 0.45).toFixed(3); c.classList.toggle("focus", Math.abs(d) < 0.18); });
+      }
+      if (ribs.length) { const dy = scrollY - lastY; lastY = scrollY; vel = clamp(vel * 0.85 + dy * 0.15, -60, 60); ribs.forEach((r, i) => r.style.setProperty("--skew", (vel * (i ? -0.08 : 0.08)).toFixed(2) + "deg"));  if (Math.abs(vel) > 0.3) req(); }
       if (tl) { const r = tl.getBoundingClientRect(), p = clamp((innerHeight * .75 - r.top) / r.height, 0, 1); tl.style.setProperty("--tp", p.toFixed(3)); }
     }
     const req = () => { if (!raf) raf = requestAnimationFrame(update); };
