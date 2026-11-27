@@ -43,7 +43,7 @@
   const cloud = () => { const a = A(); return a && a.enabled && a.user ? a : null; };
   const navFor = r => NAV.map(g => ({ ...g, items: g.items.filter(i => i[3].includes(r)) })).filter(g => g.items.length);
   const allItems = NAV.flatMap(g => g.items);
-  const titleFor = h => (allItems.find(i => i[0] === h) || [0, "Portal"])[1];
+  const titleFor = h => { if (h.startsWith("portal-lab-")) { const l = NS.LABS.find(x => "portal-lab-" + x.id === h); return l ? l.name : "Lab"; } return (allItems.find(i => i[0] === h) || [0, "Portal"])[1]; };
 
   /* ---------- UI kit (mirrors the MITK ERP components) ---------- */
   const head = (icon, eyebrow, t, sub, actions = "") => `<div class="pt-head" data-in><div class="pt-headl"><span class="pt-hic">${ic(icon)}</span><div><p class="pt-eyebrow">${esc(eyebrow)}</p><h1>${t}</h1>${sub ? `<p class="pt-sub">${sub}</p>` : ""}</div></div>${actions ? `<div class="pt-acts">${actions}</div>` : ""}</div>`;
@@ -75,7 +75,7 @@
       <aside class="pt-side ${sideOpen ? "open" : ""}" id="ptside" aria-label="Portal navigation"><div class="pt-glow"></div>
         <div class="pt-brand">${X().LOGO}<div><b>${B.first}<span>${B.second}</span></b><small>by ${B.parent}</small></div><button class="pt-x" id="ptclose" aria-label="Close menu">${ic("x")}</button></div>
         <p class="pt-portal">${esc(title(r))} portal</p>
-        <nav class="pt-nav">${groups.map(g => `<div class="pt-group"><p>${esc(g.label)}</p>${g.items.map(([href, t, icon]) => `<a href="#${href}" class="${href === h ? "on" : ""}">${ic(icon)}<span>${esc(t)}</span></a>`).join("")}</div>`).join("")}</nav>
+        <nav class="pt-nav">${groups.map(g => `<div class="pt-group"><p>${esc(g.label)}</p>${g.items.map(([href, t, icon]) => `<a href="#${href}" class="${href === h || (href === "portal-labs" && h.startsWith("portal-lab-")) ? "on" : ""}">${ic(icon)}<span>${esc(t)}</span></a>`).join("")}</div>`).join("")}</nav>
         <div class="pt-sfoot"><a href="#home">${ic("home")} Website</a><button id="ptout">${ic("logout")} Log out</button></div>
       </aside><div class="pt-scrim" id="ptscrim"></div>
       <div class="pt-main">
@@ -182,7 +182,15 @@
 
   PG["portal-tutor"] = () => ({ html: head("robot", "Learning companion", "AI Tutor — Nova", "Step-by-step help in English, Hindi or Hinglish") + `<div class="pt-tutor" id="pttutor" data-in></div>`, mount(root) { const off = X().mountTutor($("#pttutor", root), false); X().onLeave(off); } });
 
-  PG["portal-labs"] = () => { const ap = X(); return head("flask", "Experiments", "Virtual Labs", `${NS.LABS.length} interactive simulations${ap.PAID() ? "" : " · Pendulum, Lens and Magnet are free"}`) + `<div class="pt-labs">${NS.LABS.map((l, i) => `<a class="pt-lab" href="#lab-${l.id}" style="--i:${i}" data-in><div class="pt-labthumb"><canvas data-thumb="${l.id}"></canvas>${ap.labOpen(l.id) ? "" : `<span class="pt-labl">${ic("lock")} Scholar</span>`}</div><div class="pt-labb"><div class="pt-row">${badge(l.subj.toLowerCase())}<small class="pt-muted">Class ${l.cls}</small></div><b>${esc(l.name)}</b><small>${esc(l.desc)}</small></div></a>`).join("")}</div>`; };
+  PG["portal-labs"] = () => { const ap = X(); return head("flask", "Experiments", "Virtual Labs", `${NS.LABS.length} interactive simulations${ap.STAFF() ? " · full access for staff" : ap.PAID() ? "" : " · Pendulum, Lens and Magnet are free"}`) + `<div class="pt-labs">${NS.LABS.map((l, i) => `<a class="pt-lab" href="#portal-lab-${l.id}" style="--i:${i}" data-in><div class="pt-labthumb"><canvas data-thumb="${l.id}"></canvas>${ap.labOpen(l.id) ? "" : `<span class="pt-labl">${ic("lock")} Scholar</span>`}</div><div class="pt-labb"><div class="pt-row">${badge(l.subj.toLowerCase())}<small class="pt-muted">Class ${l.cls}</small></div><b>${esc(l.name)}</b><small>${esc(l.desc)}</small></div></a>`).join("")}</div>`; };
+  PG.labView = id => {
+    const ap = X(), i = NS.LABS.findIndex(l => l.id === id), l = NS.LABS[i];
+    if (!l) return head("flask", "Virtual labs", "Lab not found", "") + card(empty("That lab doesn't exist", `<a href="#portal-labs">All labs</a>`));
+    const prev = NS.LABS[(i + NS.LABS.length - 1) % NS.LABS.length], next = NS.LABS[(i + 1) % NS.LABS.length];
+    const top = head("flask", `${l.subj} · Class ${l.cls} · Lab ${i + 1} of ${NS.LABS.length}`, esc(l.name), esc(l.desc), `<a class="pt-btn" href="#portal-labs">${ic("grid")} All labs</a><a class="pt-btn" href="#portal-lab-${prev.id}" title="${esc(prev.name)}"><span style="display:inline-flex;transform:scaleX(-1)">${ic("arrow")}</span> Previous</a><a class="pt-btn pt-btn-p" href="#portal-lab-${next.id}" title="${esc(next.name)}">Next ${ic("arrow")}</a>`);
+    if (!ap.labOpen(id)) return top + card(lockBox("This lab", "Scholar"));
+    return { html: top + `<div class="pt-labview" id="ptlab" data-in></div>`, mount(root) { const inst = NS.mountLab($("#ptlab", root), id, { h: 540, ask: ap.openTutorWith }); ap.onLeave(() => inst.destroy()); ap.logAct("lab", l.name); } };
+  };
   const afterLabs = root => requestAnimationFrame(() => $$("canvas[data-thumb]", root).forEach(c => NS.thumbLab(c, c.dataset.thumb)));
 
   PG["portal-reports"] = () => {
@@ -392,7 +400,8 @@
       } else if (!ap.S.profile) { try { sessionStorage.setItem("ns_after_login", h); } catch { } location.hash = "login"; return; }
       const r = role(), item = allItems.find(i => i[0] === h);
       let out;
-      if (!PG[h]) out = head("grid", "Portal", "Page not found", "") + card(empty("That page doesn't exist", `<a href="#portal">Back to dashboard</a>`));
+      if (h.startsWith("portal-lab-")) out = PG.labView(h.slice(11));
+      else if (!PG[h]) out = head("grid", "Portal", "Page not found", "") + card(empty("That page doesn't exist", `<a href="#portal">Back to dashboard</a>`));
       else if (item && !item[3].includes(r)) out = head("lock", "Access", "No access", "") + card(empty("This page is for " + item[3].map(title).join(", ") + " accounts"));
       else out = PG[h]();
       const html = typeof out === "string" ? out : out.html;
