@@ -629,7 +629,7 @@
 
   /* static thumbnail for lab cards */
   NS.thumbLab = function (cv, id) {
-    const def = L[id], s = def.init(), r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1, W = r.width || 300, H = r.height || 140;
+    const def = L[id], s = def.init(), d = window.devicePixelRatio || 1, W = cv.clientWidth || 300, H = cv.clientHeight || 140;
     cv.width = W * d; cv.height = H * d; const ctx = cv.getContext("2d"); ctx.setTransform(d, 0, 0, d, 0, 0);
     s._sync = () => { };
     const k = 0.55, w = W / k, h = H / k;

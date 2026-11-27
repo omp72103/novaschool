@@ -22,6 +22,7 @@ index.html    page shell
 styles.css    theme
 data.js       brand, syllabus, labs, plans, FAQ, blog, legal text  ← edit content here
 labs.js       lab engine + 19 labs
+fx.js         landing-page 3D and scroll animations
 app.js        router, pages, tutor, dashboard, tests, forms
 api/ai.js     serverless AI proxy (keeps your API key secret)
 api/lead.js   serverless endpoint for demo bookings and contact messages

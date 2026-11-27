@@ -206,7 +206,7 @@ Rules:
 
   P.home = () => ({
     html: `
-    <section class="hero"><div class="wrap">
+    <section class="hero"><canvas id="sky" aria-hidden="true"></canvas><span class="glow a"></span><span class="glow b"></span><div class="wrap">
       <div><span class="pill">${B.name} · ${B.tagline}</span>
         <h1>AI-powered <span class="hl">personalised learning</span> for every student</h1>
         <p class="lead">A patient AI tutor, hands-on virtual labs and chapter-wise lessons that follow your syllabus and move at your pace.</p>
@@ -224,6 +224,8 @@ Rules:
           <div class="bubble q" id="heroQ">What is √144?</div><div class="bubble a" id="heroA"><b>√144 = 12</b>because 12 × 12 = 144</div></div>
       </div></div></section>
 
+    <section><div class="wrap"><div class="statstrip">${(() => { const st = NS.stats(); return [[st.boards, "", "boards"], [st.classes, "", "classes (5–12)"], [st.subjects, "", "subject courses"], [st.chapters, "", "chapters"], [st.lectures, "+", "AI lectures"], [st.labs, "", "interactive labs"]].map(([n, suf, l]) => `<div class="sc"><b data-count="${n}" data-suffix="${suf}">0</b><span>${l}</span></div>`).join(""); })()}</div></div></section>
+
     <section class="band" id="path"><div class="wrap">${sec("Find your path", "Start with your board and class", "Pick a board and a class, and your subjects appear.")}<div id="pathbox"></div></div></section>
 
     <section class="band alt"><div class="wrap">${sec("Why " + B.name, "Learning that fits each student")}
@@ -234,9 +236,21 @@ Rules:
 
     <section class="band alt" id="try-labs"><div class="wrap">${sec("Working labs", "Don't just read it. Try it.", "Real simulations that respond to every change. Try one now.")}
       <div class="labbar"><div class="tabs" id="labtabs" role="tablist">${[["pendulum", "Pendulum"], ["lens", "Lens"], ["magnet", "Magnet"]].map(([id, t], i) => `<button role="tab" data-lab="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div><a class="btn btn-ghost btn-sm" id="openfull" href="#lab-pendulum">Open full lab ${ic("arrow")}</a></div>
-      <div id="labhost"></div>
-      <div class="grid g4" style="margin-top:28px">${NS.LABS.filter(l => ["force", "atom", "molecule", "particles"].includes(l.id)).map(labCard).join("")}</div>
-      <div class="center" style="margin-top:24px"><a class="btn btn-blue" href="#labs">See all ${NS.LABS.length} labs ${ic("arrow")}</a></div></div></section>
+      <div id="labhost"></div></div></section>
+
+    <section class="ringsec" aria-label="All ${NS.LABS.length} labs"><div class="ringsticky"><div class="wrap" style="width:100%">${sec("The lab library", `All <span class="grad">${NS.LABS.length} labs</span>, one spin away`, "Scroll to turn the carousel, drag it, or use the arrows. Tap the front card to open that lab.")}</div>
+      <div class="ringstage"><div class="lring">${NS.LABS.map(l => `<a class="rcard" href="#lab-${l.id}" data-lab="${l.id}" draggable="false"><div class="rt"><canvas data-thumb="${l.id}"></canvas></div><div class="rb"><div class="tags"><span class="tag">${esc(l.subj)}</span><span class="tag or">${l.cls}</span></div><b>${esc(l.name)}</b><small>${esc(l.desc)}</small></div></a>`).join("")}</div></div>
+      <div class="wrap" style="width:100%"><div class="ringcap" id="ringcap"><div><b>${esc(NS.LABS[0].name)}</b><span>${NS.LABS[0].subj} · Class ${NS.LABS[0].cls}</span></div><a class="btn btn-or btn-sm" href="#lab-${NS.LABS[0].id}">Open this lab ${ic("arrow")}</a></div>
+      <div class="ringnav"><button class="iconbtn" data-ring="1" aria-label="Previous lab" style="transform:scaleX(-1)">${ic("arrow")}</button><a class="btn btn-ghost btn-sm" href="#labs">Browse all labs</a><button class="iconbtn" data-ring="-1" aria-label="Next lab">${ic("arrow")}</button></div></div></div></section>
+
+    <section class="band alt" style="padding-bottom:0"><div class="wrap">${sec("One platform", "Built for students, parents and schools", "Everything learning creates — progress, scores, time spent, demo requests — flows into clear dashboards for everyone who needs it.")}</div>
+      <div class="mgmt"><div class="wrap mgsticky">
+        <div class="mgmt-copy">${[["chart", "Student dashboard", "Progress for every subject, lectures completed, a weekly learning chart, chapter tests and an AI revision plan.", "#dashboard", "Open my dashboard"], ["heart", "Parent reports", "A clear summary of progress, scores and time spent, ready to copy and share — on the Achiever plan.", "#plans", "See Achiever"], ["shield", "School management", "Class-wise performance, enrolments and demo requests in one console, for schools that license " + B.name + ".", "#book-demo", "Talk to us"]].map(([i, t, d, h, c], k) => `<button class="mstep ${k ? "" : "on"}" type="button"><b><span class="avatar" style="color:var(--or)">${ic(i)}</span>${t}</b><p>${d} <a href="${h}">${c} →</a></p></button>`).join("")}<p class="tiny">Screens show sample data.</p></div>
+        <div class="screens">
+          <div class="screen"><div class="chrome"><i></i><i></i><i></i><span>Student dashboard</span></div><div class="mrow"><div class="mk"><small>Overall progress</small><b>62%</b></div><div class="mk"><small>Lectures done</small><b>148</b></div><div class="mk"><small>Day streak</small><b>9</b></div></div>${[["Mathematics", 74], ["Science", 58], ["English", 81], ["Social Science", 40]].map(([n, v]) => `<div class="mbar"><span style="width:110px">${n}</span><span class="progress"><i style="width:${v}%"></i></span><span>${v}%</span></div>`).join("")}<div class="mchart">${[30, 55, 42, 70, 64, 88, 50].map(h => `<i style="height:${h}%"></i>`).join("")}</div></div>
+          <div class="screen"><div class="chrome"><i></i><i></i><i></i><span>Parent report · Aarav, Class 8</span></div><div class="mrow"><div class="mk"><small>This week</small><b>3h 20m</b></div><div class="mk"><small>Tests taken</small><b>6</b></div><div class="mk"><small>Average score</small><b>78%</b></div></div><div class="mtable"><div><span>Maths: A Square and A Cube</span><em>9/10</em></div><div><span>Science: Exploring Forces</span><em>8/10</em></div><div><span>Maths mock exam</span><em>15/20</em></div><div><span>Science: Light: Mirrors and Lenses</span><em>7/10</em></div></div><p class="tiny">Strongest: English. Focus next: Social Science chapters 3–4.</p></div>
+          <div class="screen"><div class="chrome"><i></i><i></i><i></i><span>School console</span></div><div class="mrow"><div class="mk"><small>Students</small><b>1,240</b></div><div class="mk"><small>Avg. score</small><b>74%</b></div><div class="mk"><small>New demo requests</small><b>32</b></div></div><div class="mtable">${[["Class 10-A", "42 students", "81%"], ["Class 10-B", "40 students", "76%"], ["Class 9-A", "45 students", "72%"], ["Class 8-C", "38 students", "69%"]].map(([a, b, c]) => `<div><span>${a}</span><span>${b}</span><em>${c}</em></div>`).join("")}</div><div class="mchart" style="max-height:90px">${[60, 72, 66, 80, 74, 85, 78, 90].map(h => `<i style="height:${h}%;background:linear-gradient(180deg,var(--bl),var(--bl2))"></i>`).join("")}</div></div>
+        </div></div></div></section>
 
     <section class="band"><div class="wrap">${sec("Human + AI", "Better together", "The best learning blends a tireless AI tutor with caring teachers.")}
       <div class="duo"><div class="card"><h3 style="display:flex;gap:10px;align-items:center"><span class="avatar" style="color:var(--bl)">${ic("robot")}</span>What Nova brings</h3><ul class="list">${NS.AI_SIDE.map(t => `<li>${ic("tick")}<span>${t}</span></li>`).join("").replaceAll('class="icon"', 'class="icon" style="color:var(--bl)"')}</ul></div>
@@ -244,7 +258,7 @@ Rules:
       <p class="note">Nova is a learning companion. It is designed to support teachers and parents, not replace them.</p></div></section>
 
     <section class="band alt"><div class="wrap">${sec("Get started", `Join <span class="grad">${B.name}</span> in 3 easy steps`)}
-      <div class="steps">${NS.STEPS.map(([t, d], i) => `<div class="card stp"><span class="n">${i + 1}</span><small>Step ${i + 1}</small><h3 style="margin:4px 0 6px">${t}</h3><p class="muted small">${d}</p></div>`).join("")}</div>
+      <div class="timeline"><div class="steps">${NS.STEPS.map(([t, d], i) => `<div class="card stp"><span class="n">${i + 1}</span><small>Step ${i + 1}</small><h3 style="margin:4px 0 6px">${t}</h3><p class="muted small">${d}</p></div>`).join("")}</div></div>
       <div class="center" style="margin-top:26px"><a class="btn btn-or" href="#book-demo">${ic("cal")} Book Your Demo</a></div></div></section>
 
     <section class="band"><div class="wrap">${sec("Parents' stories", "What families tell us", "This section is ready for real parent feedback. The cards below are placeholders, not reviews.")}
@@ -266,6 +280,7 @@ Rules:
       let k = 0; const qEl = $("#heroQ"), aEl = $("#heroA");
       const tick = () => { if (!document.body.contains(qEl)) return; k = (k + 1) % qa.length; qEl.textContent = qa[k][0]; aEl.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>'; setTimeout(() => { if (!document.body.contains(aEl)) return; aEl.innerHTML = `<b>${esc(qa[k][1])}</b>${esc(qa[k][2])}`; }, 1300); };
       const iv = setInterval(tick, 4500); onLeave(() => clearInterval(iv));
+      if (NS.mountHomeFx) { const off = NS.mountHomeFx(app, id => { location.hash = "lab-" + id; }); onLeave(off); }
     }
   });
 
