@@ -24,17 +24,37 @@ data.js       brand, syllabus, labs, plans, FAQ, blog, legal text  ← edit cont
 labs.js       lab engine + 19 labs
 fx.js         landing-page 3D and scroll animations
 scene3d.js    WebGL 3D scroll journey (uses vendor/three.min.js, MIT)
-app.js        router, pages, tutor, dashboard, tests, forms
+app.js        router, pages, tutor, tests, forms, sign-in screens
+auth.js       accounts: Google + email sign-in, JWT sessions, profile & progress sync (Supabase)
+portal.js     student / parent / teacher / admin portal (ERP-style layout)
 api/ai.js     serverless AI proxy (keeps your API key secret)
 api/lead.js   serverless endpoint for demo bookings and contact messages
 vercel.json   headers
 ```
 
+## Accounts, Google sign-in and the portal
+
+Accounts use **Supabase Auth** (Google OAuth with PKCE, or email + password). Every session is a signed JWT that refreshes automatically; the database checks it on every request through row-level security.
+
+Database tables (all prefixed `ns_`, isolated from other apps in the same project): `ns_profiles`, `ns_state`, `ns_test_results`, `ns_leads`, `ns_notices`, `ns_audit`, `ns_admins`.
+
+Roles: **student**, **parent** (learning portal), **teacher** (leads, users read-only, results, notices), **admin** (everything, incl. role/plan changes and the audit log). Emails listed in `ns_admins` become admins automatically on first sign-in. To add another admin, run in the Supabase SQL editor:
+
+```sql
+insert into public.ns_admins(email) values ('someone@example.com');
+update public.ns_profiles set role = 'admin' where email = 'someone@example.com';
+```
+
+### One-time Supabase setup
+1. **Authentication → URL Configuration → Redirect URLs:** add `https://omp72103.github.io/novaschool/` (and your Vercel URL if you use one). Leave *Site URL* unchanged.
+2. **Authentication → Sign In / Providers → Google:** enable it and paste the Client ID and Client Secret from Google Cloud Console. In Google Cloud, the OAuth client's *Authorized redirect URI* must be `https://waffuxrfqswovuqkpedm.supabase.co/auth/v1/callback`.
+3. **Emails (recommended):** Supabase's built-in mailer is rate-limited; add your own SMTP under Authentication → Emails before launch.
+
 ## Deploy on Vercel
 
 1. Go to **vercel.com/new**, choose **Import Git Repository**, and pick `omp72103/novaschool`.
 2. Framework preset: **Other**. Leave build command and output directory empty.
-3. Under **Environment Variables**, add `ANTHROPIC_API_KEY` (from console.anthropic.com). Optionally add `LEAD_WEBHOOK_URL`.
+3. Under **Environment Variables**, add `ANTHROPIC_API_KEY` (from console.anthropic.com). To allow only signed-in users to use the AI tutor, also add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as in `data.js`). Optionally add `LEAD_WEBHOOK_URL`.
 4. Click **Deploy**. Every push to this repo redeploys automatically.
 
 ## Run locally
@@ -54,5 +74,5 @@ npm run check      # syntax check
 ## Before launch
 
 - **Payments** are not connected: choosing a plan activates it in demo mode. Add a gateway (e.g. Razorpay) and set `paymentsLive: true` in `NS.CONFIG`.
-- **Leads** are written to the Vercel logs (search `NOVASCHOOL_LEAD`) and, if set, sent to `LEAD_WEBHOOK_URL`.
-- **Student progress** is stored in each visitor's browser. Add a database (e.g. Supabase) for cross-device accounts.
+- **Leads and messages** are saved to Supabase and managed in the portal (Admission Leads / Messages).
+- **Student progress** syncs to the signed-in account across devices.
