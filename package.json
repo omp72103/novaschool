@@ -1,0 +1,11 @@
+{
+  "name": "novaschool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NovaSchool — AI-powered personalised learning for Classes 5–12 (static site + Vercel serverless API).",
+  "scripts": {
+    "dev": "npx vercel dev",
+    "check": "node -e \"for (const f of ['data.js','labs.js','app.js','api/ai.js','api/lead.js']) new (require('vm').Script)(require('fs').readFileSync(f,'utf8'),{filename:f}); console.log('syntax ok')\""
+  },
+  "engines": { "node": ">=20" }
+}
