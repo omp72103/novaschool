@@ -4,6 +4,15 @@ module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ code: "method_not_allowed" });
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return res.status(503).json({ code: "unavailable", message: "AI key not configured" });
+  // Optional: require a valid Supabase session JWT (set SUPABASE_URL and SUPABASE_ANON_KEY in Vercel)
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    const auth = String(req.headers.authorization || "");
+    if (!/^Bearer\s+\S+/.test(auth)) return res.status(401).json({ code: "signin" });
+    try {
+      const u = await fetch(process.env.SUPABASE_URL + "/auth/v1/user", { headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: auth } });
+      if (!u.ok) return res.status(401).json({ code: "signin" });
+    } catch { return res.status(503).json({ code: "unavailable" }); }
+  }
   const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0] || "anon", now = Date.now();
   const h = (hits.get(ip) || []).filter(t => now - t < 60000); h.push(now); hits.set(ip, h);
   if (h.length > 20) return res.status(429).json({ code: "rate_limited" });

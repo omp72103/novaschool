@@ -12,7 +12,12 @@ NS.BRAND = {
 };
 
 /* Optional: point to your own backend (POST {messages} -> {text}) when hosting outside Claude. */
-NS.CONFIG = { aiEndpoint: "/api/ai", leadEndpoint: "/api/lead", paymentsLive: false };
+NS.CONFIG = {
+  aiEndpoint: "/api/ai", leadEndpoint: "/api/lead", paymentsLive: false,
+  /* Supabase project (public values — access is enforced by row-level security in the database) */
+  supabaseUrl: "https://waffuxrfqswovuqkpedm.supabase.co",
+  supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhZmZ1eHJmcXN3b3Z1cWtwZWRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDM3MDcsImV4cCI6MjEwODc3OTcwN30.RGtV6EvlCzKZIQna2xCA0IvumJLnrBBZXistLBD-Oy0"
+};
 
 NS.BOARDS = [
   { id: "cbse", name: "CBSE", full: "Central Board of Secondary Education" },

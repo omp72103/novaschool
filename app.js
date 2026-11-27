@@ -78,8 +78,11 @@
     if (caps.owner) renderChrome();
   })();
   let saveT = null, writing = Promise.resolve();
+  const AU = () => NS.auth && NS.auth.enabled ? NS.auth : null;
+  const cloudState = () => { const c = JSON.parse(JSON.stringify(S)); delete c.profile; delete c.plan; delete c.billing; return c; };
   function save() {
     S.updatedAt = Date.now(); LS.set("ns_state", S);
+    const A = AU(); if (A && A.user) { clearTimeout(save._c); save._c = setTimeout(() => A.saveState(cloudState()), 1200); }
     clearTimeout(saveT);
     saveT = setTimeout(() => { if (caps.db && caps.uid) { const body = JSON.parse(JSON.stringify(S)); writing = writing.then(() => caps.db.doc(`data/users/${caps.uid}/state`).set(body)).catch(() => { }); } }, 1500);
   }
@@ -100,14 +103,16 @@
     await Promise.race([pSample, new Promise(r => setTimeout(r, 3000))]);
     if (caps.sample) { const r = await caps.sample(messages, { cache: false, ...opts }); return r.text; }
     if (NS.CONFIG.aiEndpoint) {
-      let res; try { res = await fetch(NS.CONFIG.aiEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }), signal: opts.signal }); } catch (e) { if (e && e.name === "AbortError") throw e; throw { code: "unavailable" }; }
+      const tok = NS.auth && NS.auth.session && NS.auth.session.access_token;
+      let res; try { res = await fetch(NS.CONFIG.aiEndpoint, { method: "POST", headers: { "Content-Type": "application/json", ...(tok ? { Authorization: "Bearer " + tok } : {}) }, body: JSON.stringify({ messages }), signal: opts.signal }); } catch (e) { if (e && e.name === "AbortError") throw e; throw { code: "unavailable" }; }
       let j = {}; try { j = await res.json(); } catch { }
+      if (res.status === 401) throw { code: "signin", message: "Please sign in to use Nova." };
       if (!res.ok || typeof j.text !== "string") throw { code: res.status === 429 ? "rate_limited" : (j.code || "unavailable") };
       opts.onText && opts.onText({ text: j.text }); return j.text;
     }
     throw { code: "unavailable", message: "AI is not connected in this view." };
   }
-  const aiErr = e => e && e.code === "rate_limited" ? "Nova is busy right now. Please wait a moment and try again." : e && e.code === "not_granted" ? "AI access was not allowed in this view, so Nova can't answer here." : "Nova can't answer right now. Please try again in a minute — if it keeps happening, let us know.";
+  const aiErr = e => e && e.code === "signin" ? "Please sign in (top right) to chat with Nova — it's free." : e && e.code === "rate_limited" ? "Nova is busy right now. Please wait a moment and try again." : e && e.code === "not_granted" ? "AI access was not allowed in this view, so Nova can't answer here." : "Nova can't answer right now. Please try again in a minute — if it keeps happening, let us know.";
   function md(t) {
     const inl = s => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
     let out = "", list = null; const flush = () => { if (list) { out += `</${list}>`; list = null; } };
@@ -151,12 +156,12 @@ Rules:
         <button class="burger" id="burger" aria-label="Open menu">${ic("menu")}</button>
       </div></div>
       <div class="menu" id="umenu">${p ? `<div class="who"><b style="color:#fff">${esc(p.name)}</b><div class="tiny">${esc(p.role)} · ${planName()} plan</div></div>
-        <a href="#dashboard">${ic("chart")} Dashboard</a><a href="#tutor">${ic("robot")} AI Tutor</a><a href="#course-${courseKeyFor(p)}">${ic("book")} My subjects</a><a href="#plans">${ic("star")} Plans</a>${caps.owner ? `<a href="#admin">${ic("shield")} Admin: leads</a>` : ""}<button id="signout">${ic("logout")} Sign out</button>`
+        <a href="#portal">${ic("chart")} My portal</a><a href="#portal-tutor">${ic("robot")} AI Tutor</a>${p.sysRole === "admin" || p.sysRole === "teacher" ? `<a href="#portal-admin">${ic("shield")} Management portal</a>` : ""}<a href="#course-${courseKeyFor(p)}">${ic("book")} My subjects</a><a href="#plans">${ic("star")} Plans</a>${caps.owner ? `<a href="#admin">${ic("shield")} Admin: leads</a>` : ""}<button id="signout">${ic("logout")} Sign out</button>`
         : `<a href="#login">${ic("user")} Student Login</a><a href="#login">${ic("cap")} Create free account</a><a href="#book-demo">${ic("cal")} Book a free demo</a>${caps.owner ? `<a href="#admin">${ic("shield")} Admin: leads</a>` : ""}`}</div>
-      <nav class="mnav" id="mnav" aria-label="Mobile">${NAV.map(([h, t]) => `<a href="#${h}">${t}</a>`).join("")}<a href="#tutor">AI Tutor</a><a href="${p ? "#dashboard" : "#login"}">${p ? "Dashboard" : "Student Login"}</a></nav>`;
+      <nav class="mnav" id="mnav" aria-label="Mobile">${NAV.map(([h, t]) => `<a href="#${h}">${t}</a>`).join("")}<a href="#tutor">AI Tutor</a><a href="${p ? "#portal" : "#login"}">${p ? "My portal" : "Student Login"}</a></nav>`;
     $("#ubtn").onclick = e => { e.stopPropagation(); $("#umenu").classList.toggle("open"); };
     $("#burger").onclick = () => $("#mnav").classList.toggle("open");
-    const so = $("#signout"); if (so) so.onclick = () => { S.profile = null; S.plan = "starter"; save(); renderChrome(); location.hash = "home"; toast("Signed out"); };
+    const so = $("#signout"); if (so) so.onclick = signOut;
     $("#foot").innerHTML = `<div class="wrap"><div class="fgrid">
       <div><a class="logo" href="#home">${LOGO}<span><b>${B.first}<span>${B.second}</span></b><i>— BY ${B.parent} —</i></span></a>
         <p class="muted small" style="margin:14px 0">Next-gen, AI-powered personalised learning for Classes 5 to 12.</p>
@@ -166,6 +171,11 @@ Rules:
       <div><h4>Legal</h4><ul><li><a href="#privacy">Privacy policy</a></li><li><a href="#terms">Terms of use</a></li><li><a href="#cookies">Cookie policy</a></li></ul>
         <h4 style="margin-top:20px">Follow us</h4><div class="social" title="Coming soon">${["in", "ig", "yt", "fb", "x"].map(s => `<span>${s}</span>`).join("")}</div><p class="tiny" style="margin-top:6px">Social channels coming soon</p></div>
     </div><div class="copy"><span>© ${new Date().getFullYear()} ${B.company}. All rights reserved.</span><span>Made in India for curious students</span></div></div>`;
+  }
+  async function signOut() {
+    const A = AU();
+    if (A && A.user) { try { await A.signOut("local"); } catch { } }
+    S = blank(); LS.set("ns_state", S); authTab = "signin"; renderChrome(); location.hash = "home"; toast("Signed out");
   }
   document.addEventListener("click", e => { if (!e.target.closest("#ubtn")) $("#umenu")?.classList.remove("open"); if (e.target.closest("#mnav a")) $("#mnav").classList.remove("open"); });
   const courseKeyFor = p => { const subs = NS.subjectsFor(p.board, p.cls, p.stream); return `${p.board}-${p.cls}-${subs[0].slug}`; };
@@ -427,11 +437,15 @@ Use ### headings, short paragraphs and lists. 350–550 words. Do not add a titl
     if (!S.profile) { LS.set("ns_pending_plan", id); toast("Create your free account first — it takes a few seconds."); location.hash = "login"; return; }
     const p = NS.PLANS.find(x => x.id === id), price = billing === "m" ? p.m : p.y;
     modal(`<h3>Switch to ${p.name}</h3><p class="muted" style="margin:10px 0">${price ? `${inr(price)} ${billing === "m" ? "per month" : "per year"} (indicative).` : "Free forever."}</p>${!NS.CONFIG.paymentsLive && price ? `<div class="warnbox">Payments aren't connected in this build. Confirming activates ${p.name} in demo mode so you can try every feature. Connect a payment gateway in CONFIG before launch.</div>` : ""}<div class="ctas" style="margin-top:18px"><button class="btn btn-blue" id="conf">Confirm ${p.name}</button><button class="btn btn-dark" data-close>Cancel</button></div>`,
-      m => { $("#conf", m).onclick = () => { S.plan = id; S.billing = billing; logAct("plan", "Switched to " + p.name); closeModal(); renderChrome(); toast(`${p.name} plan is now active`); location.hash = "dashboard"; }; });
+      m => { $("#conf", m).onclick = async () => {
+        const A = AU();
+        if (A && A.user) { try { await A.updateProfile({ plan: id, billing }); } catch (e) { toast(e.message); return; } }
+        S.plan = id; S.billing = billing; logAct("plan", "Switched to " + p.name); closeModal(); renderChrome(); toast(`${p.name} plan is now active`); location.hash = "portal"; }; });
   }
 
   /* ----- login / profile ----- */
   P.login = () => {
+    if (AU()) return authLogin();
     const p = S.profile || {};
     if (S.profile && !LS.get("ns_edit", false)) return `<section class="band"><div class="wrap" style="max-width:560px"><div class="card center"><span class="avatar" style="width:56px;height:56px;margin:0 auto 12px;font-size:18px">${esc(p.name.slice(0, 2).toUpperCase())}</span><h2>You're signed in, ${esc(p.name.split(" ")[0])}</h2><p class="muted" style="margin:8px 0 20px">${planName()} plan · Class ${p.cls} · ${NS.BOARDS.find(b => b.id === p.board).name}</p><div class="ctas" style="justify-content:center"><a class="btn btn-blue" href="#dashboard">Go to dashboard</a><button class="btn btn-dark" id="editp">Edit profile</button></div></div></div></section>`;
     return `<section class="band"><div class="wrap" style="max-width:620px"><div class="card"><span class="eyebrow">Student Login</span><h2>${S.profile ? "Edit your profile" : "Continue to your dashboard"}</h2><p class="muted small" style="margin:8px 0 20px">${caps.db ? "Your progress is saved to your account and follows you across devices." : "Your progress is saved in this browser."} No password needed.</p>
@@ -448,6 +462,7 @@ Use ### headings, short paragraphs and lists. 350–550 words. Do not add a titl
         <p class="tiny">By continuing you agree to our <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>. Students under 18 should sign up with a parent.</p></form></div></div></section>`;
   };
   P.login.mount = () => {
+    if (AU()) return authLoginMount();
     const ed = $("#editp"); if (ed) { ed.onclick = () => { LS.set("ns_edit", true); route(); }; return; }
     const sf = () => { $("#streamf").style.display = +$("#f-cls").value >= 11 ? "" : "none"; }; $("#f-cls").onchange = sf; sf();
     $("#lf").onsubmit = e => {
@@ -460,14 +475,15 @@ Use ### headings, short paragraphs and lists. 350–550 words. Do not add a titl
       LS.set("ns_edit", false); if (first) logAct("join", "Joined " + B.name); else save();
       renderChrome(); toast(first ? `Welcome to ${B.name}, ${name.split(" ")[0]}!` : "Profile saved");
       const pend = LS.get("ns_pending_plan", null); LS.set("ns_pending_plan", null);
-      if (pend && pend !== "starter") { location.hash = "plans"; setTimeout(() => choosePlan(pend), 300); } else location.hash = "dashboard";
+      if (pend && pend !== "starter") { location.hash = "plans"; setTimeout(() => choosePlan(pend), 300); } else location.hash = "portal";
     };
   };
 
   /* ----- dashboard ----- */
   function allCourseStats() { const p = S.profile; return NS.subjectsFor(p.board, p.cls, p.stream).map(s => { const key = `${p.board}-${p.cls}-${s.slug}`; return { s, key, ...courseStats(key, s) }; }); }
   function last7() { const out = []; for (let i = 6; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5); const k = d.toLocaleDateString("en-CA"); out.push([d.toLocaleDateString("en-IN", { weekday: "short" }), S.activity[k] || 0, k]); } return out; }
-  P.dashboard = () => {
+  P.dashboard = () => { setTimeout(() => location.hash = "portal"); return ""; };
+  P.dashboardOld = () => {
     if (!S.profile) { setTimeout(() => location.hash = "login"); return ""; }
     const p = S.profile, cs = allCourseStats(), done = cs.reduce((a, c) => a + c.done, 0), total = cs.reduce((a, c) => a + c.total, 0), pct = Math.round(done / total * 100);
     const labsUsed = new Set(S.log.filter(l => l.type === "lab").map(l => l.label)).size, avg = S.tests.length ? Math.round(S.tests.reduce((a, t) => a + t.score / t.total, 0) / S.tests.length * 100) : null;
@@ -491,7 +507,7 @@ Use ### headings, short paragraphs and lists. 350–550 words. Do not add a titl
         <div class="card"><h3>Account</h3><div class="ctas" style="margin-top:12px"><a class="btn btn-dark btn-sm" href="#login" id="editprof">Edit profile</a><a class="btn btn-dark btn-sm" href="#plans">Plans</a></div></div>
       </aside></div></div></section>`;
   };
-  P.dashboard.mount = () => {
+  P.dashboardOld.mount = () => {
     if (!S.profile) return;
     const ep = $("#editprof"); if (ep) ep.onclick = () => LS.set("ns_edit", true);
     const cs = allCourseStats(), ts = $("#t-sub");
@@ -542,14 +558,16 @@ Return ONLY JSON, no other text: {"questions":[{"q":"question","options":["A","B
     if (!t.qs) return head + `<section class="band" style="padding-top:0"><div class="wrap"><div class="card center"><span class="spin"></span><p class="muted" style="margin-top:10px">Nova is writing your questions…</p></div></div></section>`;
     const score = t.qs.reduce((a, q, i) => a + (t.ans[i] === q.answer ? 1 : 0), 0);
     return head + `<section class="band" style="padding-top:0"><div class="wrap" style="max-width:820px">${t.note ? `<div class="warnbox" style="margin-bottom:16px">${esc(t.note)}</div>` : ""}
-      ${t.done ? `<div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap"><div class="price">${score}/${t.qs.length}</div><div><b style="color:#fff">${score / t.qs.length >= .8 ? "Excellent work!" : score / t.qs.length >= .5 ? "Good effort — review the ones you missed." : "Keep practising — read the explanations below."}</b><p class="muted small">Saved to your dashboard.</p></div><a class="btn btn-blue" style="margin-left:auto" href="#dashboard">Back to dashboard</a></div>` : ""}
+      ${t.done ? `<div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap"><div class="price">${score}/${t.qs.length}</div><div><b style="color:#fff">${score / t.qs.length >= .8 ? "Excellent work!" : score / t.qs.length >= .5 ? "Good effort — review the ones you missed." : "Keep practising — read the explanations below."}</b><p class="muted small">Saved to your dashboard.</p></div><a class="btn btn-blue" style="margin-left:auto" href="#portal-tests">Back to tests</a></div>` : ""}
       <form class="card quiz" id="quiz">${t.qs.map((q, i) => `<div class="q"><b>${i + 1}. ${esc(q.q)}</b>${q.options.map((o, j) => { let cl = t.ans[i] === j ? "on" : ""; if (t.done) cl = j === q.answer ? "right" : t.ans[i] === j ? "wrong" : ""; return `<button type="button" class="choice ${cl}" data-q="${i}" data-o="${j}" ${t.done ? "disabled" : ""}>${"ABCD"[j]}. ${esc(o)}</button>`; }).join("")}${t.done ? `<p class="small muted">${esc(q.explain || "")}</p>` : ""}</div>`).join("")}
       ${t.done ? "" : `<button class="btn btn-or" style="border-radius:8px" type="submit">Submit answers</button> <span class="tiny" id="answered"></span>`}</form></div></section>`;
   };
   P.test.mount = () => {
     const t = activeTest; if (!t || !t.qs) return;
     const q = $("#quiz"), upd = () => { const a = $("#answered"); if (a) a.textContent = `${Object.keys(t.ans).length} of ${t.qs.length} answered`; }; upd();
-    const finish = () => { if (t.done) return; t.done = true; const score = t.qs.reduce((a, x, i) => a + (t.ans[i] === x.answer ? 1 : 0), 0); S.tests.unshift({ title: t.cfg.kind === "mock" ? `${t.cfg.subject} mock` : `${t.cfg.subject}: ${t.cfg.chapter}`, score, total: t.qs.length, date: today() }); S.tests = S.tests.slice(0, 50); logAct("test", `Test: ${S.tests[0].title} (${score}/${t.qs.length})`); route(); };
+    const finish = () => { if (t.done) return; t.done = true; const score = t.qs.reduce((a, x, i) => a + (t.ans[i] === x.answer ? 1 : 0), 0); S.tests.unshift({ title: t.cfg.kind === "mock" ? `${t.cfg.subject} mock` : `${t.cfg.subject}: ${t.cfg.chapter}`, score, total: t.qs.length, date: today() }); S.tests = S.tests.slice(0, 50); logAct("test", `Test: ${S.tests[0].title} (${score}/${t.qs.length})`);
+      const A = AU(); if (A && A.user) A.client.from("ns_test_results").insert({ title: S.tests[0].title, subject: t.cfg.subject, kind: t.cfg.kind === "mock" ? "mock" : "chapter", score, total: t.qs.length }).then(({ error }) => { if (error) console.warn(error); });
+      route(); };
     q.onclick = e => { const b = e.target.closest(".choice"); if (!b || t.done) return; t.ans[+b.dataset.q] = +b.dataset.o; $$(`.choice[data-q="${b.dataset.q}"]`).forEach(x => x.classList.toggle("on", x === b)); upd(); };
     q.onsubmit = e => { e.preventDefault(); if (Object.keys(t.ans).length < t.qs.length) { modal(`<h3>Submit with unanswered questions?</h3><p class="muted" style="margin:10px 0 18px">${t.qs.length - Object.keys(t.ans).length} questions are still blank and will be marked wrong.</p><div class="ctas"><button class="btn btn-blue" id="sub">Submit anyway</button><button class="btn btn-dark" data-close>Keep going</button></div>`, m => $("#sub", m).onclick = () => { closeModal(); finish(); }); } else finish(); };
     if (t.cfg.minutes && !t.done) { const end = t.start + t.cfg.minutes * 60000; const iv = setInterval(() => { const left = Math.max(0, end - Date.now()), el = $("#timer"); if (el) el.textContent = `Time left: ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, "0")}`; if (!left) { clearInterval(iv); toast("Time's up — submitting your answers"); finish(); } }, 1000); onLeave(() => clearInterval(iv)); }
@@ -623,6 +641,11 @@ Return ONLY JSON, no other text: {"questions":[{"q":"question","options":["A","B
   async function submitLead(kind, entry) {
     entry.at = new Date().toISOString(); const local = LS.get("ns_" + kind, []); local.unshift(entry); LS.set("ns_" + kind, local.slice(0, 20));
     await remoteReady;
+    const A = AU();
+    if (A) {
+      const row = kind === "leads" ? { kind: "demo", name: entry.name, phone: entry.phone, board: entry.board, cls: String(entry.cls || ""), pref_date: entry.date || null, pref_time: entry.time || null, topic: entry.topic || null } : { kind: "message", name: entry.name, phone: entry.phone, email: entry.email || null, message: entry.msg || null };
+      const { error } = await A.client.from("ns_leads").insert(row); if (!error) return true; console.warn(error);
+    }
     const viaApi = async () => { if (!NS.CONFIG.leadEndpoint) return false; try { const r = await fetch(NS.CONFIG.leadEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, ...entry }) }); return r.ok; } catch { return false; } };
     if (!caps.db || !caps.uid) return viaApi();
     try { const ref = caps.db.doc(`${kind}/${caps.uid}`), snap = await ref.get(), list = snap.exists ? (snap.data().items || []) : []; await ref.set({ items: [entry, ...list].slice(0, 20), updatedAt: entry.at }); return true; } catch { return viaApi(); }
@@ -684,6 +707,9 @@ Return ONLY JSON, no other text: {"questions":[{"q":"question","options":["A","B
   function route() {
     cleanups.forEach(f => { try { f(); } catch { } }); cleanups = []; closeModal();
     const h = decodeURIComponent(location.hash.slice(1)) || "home";
+    const isPortal = h === "portal" || h.startsWith("portal-");
+    document.body.classList.toggle("portal-mode", isPortal);
+    if (isPortal && NS.portal) { try { NS.portal.render(h, app); } catch (e) { console.error(e); app.innerHTML = notFound(); } $("#fab").style.display = h === "portal-tutor" ? "none" : ""; document.title = `${NS.portal.title(h)} | ${B.name}`; window.scrollTo(0, 0); return; }
     let fn = P[h], arg;
     if (!fn) for (const [p, k] of PREFIX) if (h.startsWith(p)) { fn = P[k]; arg = h.slice(p.length); }
     const out = fn ? fn(arg) : notFound();
@@ -697,7 +723,134 @@ Return ONLY JSON, no other text: {"questions":[{"q":"question","options":["A","B
   }
   window.addEventListener("hashchange", route);
 
+  /* ---------- accounts (Supabase) ---------- */
+  const PROTECTED = ["onboarding", "reset-password"];
+  const needsOnboarding = () => { const p = NS.auth.profile; return p && (p.role === "student" || p.role === "parent") && (!p.board || !p.cls); };
+  const synced = {};
+  async function syncFromAuth(ev) {
+    const A = NS.auth;
+    if (!A.user) {
+      if (ev === "SIGNED_OUT" || (S.ownerId && !A.user)) { S = blank(); LS.set("ns_state", S); }
+      renderChrome();
+      const h = location.hash.slice(1);
+      if (h.startsWith("portal") || PROTECTED.includes(h)) { try { sessionStorage.setItem("ns_after_login", h); } catch { } location.hash = "login"; } else route();
+      return;
+    }
+    const p = A.profile;
+    if (p) {
+      if (!synced[p.id]) {
+        synced[p.id] = true;
+        const r = await A.loadState().catch(() => null);
+        if (r && r.state && (S.ownerId !== p.id || (r.state.updatedAt || 0) > (S.updatedAt || 0))) S = Object.assign(blank(), r.state);
+        else if (S.ownerId && S.ownerId !== p.id) S = blank();
+        S.ownerId = p.id;
+      }
+      S.profile = { name: p.full_name || (p.email || "").split("@")[0], role: p.role[0].toUpperCase() + p.role.slice(1), sysRole: p.role, lang: p.lang, board: p.board || "cbse", cls: p.cls || 8, stream: p.stream || "PCM", email: p.email, phone: p.phone, uid: p.id, avatar: p.avatar_url, since: (p.created_at || "").slice(0, 10) };
+      S.plan = p.plan; S.billing = p.billing; tutor.lang = p.lang || tutor.lang;
+      Object.assign(pathState, { board: S.profile.board, cls: S.profile.cls, stream: S.profile.stream });
+      LS.set("ns_state", S); if (A.isNew) { A.isNew = false; logAct("join", "Joined " + B.name); }
+    }
+    renderChrome();
+    if (A.recovery) { location.hash = "reset-password"; return; }
+    if (p && needsOnboarding() && location.hash !== "#onboarding") { location.hash = "onboarding"; return; }
+    if (ev === "SIGNED_IN" && (location.hash === "#login" || location.hash === "" || location.hash === "#home")) { location.hash = A.afterLogin(); return; }
+    if (ev === "SIGNED_IN" || ev === "INITIAL" || ev === "PROFILE" || ev === "USER_UPDATED") route();
+  }
+
+  const GLOGO = `<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.2 44 33 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+  let authTab = "signin";
+  function authLogin() {
+    const A = NS.auth;
+    if (A.user && A.profile) return `<section class="band"><div class="wrap" style="max-width:560px"><div class="card center"><span class="avatar" style="width:56px;height:56px;margin:0 auto 12px;font-size:18px">${esc((A.profile.full_name || "?").slice(0, 2).toUpperCase())}</span><h2>You're signed in, ${esc((A.profile.full_name || "").split(" ")[0])}</h2><p class="muted" style="margin:8px 0 20px">${esc(A.profile.email || "")} · ${esc(A.profile.role)}</p><div class="ctas" style="justify-content:center"><a class="btn btn-blue" href="#portal">Open my portal</a><button class="btn btn-dark" id="so2">Sign out</button></div></div></div></section>`;
+    const boards = NS.BOARDS.map(b => `<option value="${b.id}">${b.name}</option>`).join(""), classes = NS.CLASSES.map(c => `<option ${c === 8 ? "selected" : ""}>${c}</option>`).join("");
+    return `<section class="band authband"><div class="wrap authgrid">
+      <div class="authside"><span class="pill">${B.name} accounts</span><h1 style="font-size:clamp(30px,4vw,44px)">Your learning, saved and synced everywhere</h1>
+        <ul class="list"><li>${ic("tick")}<span>One click with Google, or use your email</span></li><li>${ic("tick")}<span>Progress, tests and plans sync across devices</span></li><li>${ic("tick")}<span>Secure sessions with signed, auto-refreshing tokens</span></li><li>${ic("tick")}<span>Separate student and parent accounts</span></li></ul>
+        <p class="tiny" style="margin-top:18px">By continuing you agree to our <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>. Students under 18 should sign up with a parent.</p></div>
+      <div class="card authcard">
+        <div class="toggle" id="atabs" style="margin:0 0 18px;width:100%"><button data-t="signin" class="${authTab === "signin" ? "on" : ""}" style="flex:1">Sign in</button><button data-t="signup" class="${authTab === "signup" ? "on" : ""}" style="flex:1">Create account</button></div>
+        ${A.urlError ? `<div class="warnbox" style="margin-bottom:14px">${esc(A.urlError)}</div>` : ""}
+        <button class="gbtn" id="gbtn" type="button">${GLOGO}<span>Continue with Google</span></button>
+        <div class="ordiv"><span>or with email</span></div>
+        <div id="amsg" role="alert"></div>
+        <form class="form" id="fsignin" ${authTab === "signin" ? "" : "hidden"} novalidate>
+          <div class="field"><label for="si-email">Email</label><input id="si-email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="si-pw">Password</label><div class="pwrap"><input id="si-pw" type="password" autocomplete="current-password" required><button type="button" class="pweye" data-eye="si-pw" aria-label="Show password">${ic("lock")}</button></div></div>
+          <button class="btn btn-blue" type="submit">Sign in</button>
+          <button class="linkbtn" type="button" id="forgot">Forgot password?</button>
+        </form>
+        <form class="form" id="fsignup" ${authTab === "signup" ? "" : "hidden"} novalidate>
+          <div class="row2"><div class="field"><label for="su-name">Full name</label><input id="su-name" autocomplete="name" required></div><div class="field"><label for="su-role">I am a</label><select id="su-role"><option value="student">Student</option><option value="parent">Parent</option></select></div></div>
+          <div class="field"><label for="su-email">Email</label><input id="su-email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="su-pw">Password</label><div class="pwrap"><input id="su-pw" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="pweye" data-eye="su-pw" aria-label="Show password">${ic("lock")}</button></div><div class="pwmeter"><i id="pwbar"></i></div><p class="tiny" id="pwhint">At least 8 characters, with a number.</p></div>
+          <div class="row2"><div class="field"><label for="su-board">Board</label><select id="su-board">${boards}</select></div><div class="field"><label for="su-cls">Class</label><select id="su-cls">${classes}</select></div></div>
+          <div class="row2"><div class="field" id="su-streamf" hidden><label for="su-stream">Stream</label><select id="su-stream">${Object.keys(NS.STREAMS).map(x => `<option>${x}</option>`).join("")}</select></div><div class="field"><label for="su-lang">Language</label><select id="su-lang"><option>English</option><option>Hindi</option><option>Hinglish</option></select></div></div>
+          <label class="check"><input type="checkbox" id="su-terms"> <span>I agree to the <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a></span></label>
+          <button class="btn btn-or" style="border-radius:8px" type="submit">Create my account</button>
+        </form>
+        <form class="form" id="fforgot" hidden novalidate><p class="muted small">Enter your email and we'll send you a link to set a new password.</p><div class="field"><label for="fp-email">Email</label><input id="fp-email" type="email" autocomplete="email" required></div><button class="btn btn-blue" type="submit">Send reset link</button><button class="linkbtn" type="button" id="backsi">Back to sign in</button></form>
+      </div></div></section>`;
+  }
+  function authLoginMount() {
+    const A = NS.auth, msg = (t, ok) => { const m = $("#amsg"); if (m) m.innerHTML = t ? `<div class="${ok ? "okbox" : "warnbox"}" style="margin-bottom:12px">${t}</div>` : ""; };
+    const so2 = $("#so2"); if (so2) { so2.onclick = signOut; return; }
+    const show = id => ["fsignin", "fsignup", "fforgot"].forEach(f => $("#" + f).hidden = f !== id);
+    $("#atabs").onclick = e => { const b = e.target.closest("[data-t]"); if (!b) return; authTab = b.dataset.t; $$("#atabs button").forEach(x => x.classList.toggle("on", x === b)); show(authTab === "signin" ? "fsignin" : "fsignup"); msg(""); };
+    $$("[data-eye]").forEach(b => b.onclick = () => { const i = $("#" + b.dataset.eye); i.type = i.type === "password" ? "text" : "password"; });
+    const busy = (btn, on, label) => { btn.disabled = on; if (on) { btn.dataset.l = btn.innerHTML; btn.innerHTML = `<span class="spin" style="width:16px;height:16px;border-width:2px"></span> ${label}`; } else if (btn.dataset.l) btn.innerHTML = btn.dataset.l; };
+    $("#gbtn").onclick = async () => { const b = $("#gbtn"); busy(b, true, "Opening Google…"); try { await A.signInGoogle(); } catch (e) { busy(b, false); msg(esc(e.message)); } };
+    const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+    $("#fsignin").onsubmit = async e => { e.preventDefault(); const em = $("#si-email").value, pw = $("#si-pw").value, b = e.target.querySelector("[type=submit]"); if (!emailOk(em)) return msg("Please enter a valid email."); if (!pw) return msg("Please enter your password."); busy(b, true, "Signing in…"); try { await A.signIn(em, pw); msg("Signed in. Loading your portal…", true); } catch (err) { msg(esc(err.message)); } busy(b, false); };
+    const sc = $("#su-cls"), sf = $("#su-streamf"); sc.onchange = () => sf.hidden = +sc.value < 11;
+    $("#su-pw").oninput = e => { const v = e.target.value, sc2 = (v.length >= 8) + /\d/.test(v) + /[A-Z]/.test(v) + /[^A-Za-z0-9]/.test(v) + (v.length >= 12); $("#pwbar").style.width = sc2 * 20 + "%"; $("#pwbar").style.background = sc2 < 3 ? "var(--bad)" : sc2 < 4 ? "var(--or)" : "var(--ok)"; $("#pwhint").textContent = ["Too short", "Weak", "Okay", "Good", "Strong", "Very strong"][sc2]; };
+    $("#fsignup").onsubmit = async e => {
+      e.preventDefault(); const name = $("#su-name").value.trim(), em = $("#su-email").value, pw = $("#su-pw").value, b = e.target.querySelector("[type=submit]");
+      if (name.length < 2) return msg("Please enter your full name."); if (!emailOk(em)) return msg("Please enter a valid email."); if (pw.length < 8 || !/\d/.test(pw)) return msg("Password needs at least 8 characters including a number."); if (!$("#su-terms").checked) return msg("Please accept the Terms and Privacy Policy.");
+      busy(b, true, "Creating account…");
+      try {
+        const r = await A.signUp({ email: em, password: pw, full_name: name, role: $("#su-role").value, board: $("#su-board").value, cls: +$("#su-cls").value, stream: $("#su-stream").value, lang: $("#su-lang").value });
+        if (r.needsConfirm) { msg(`Almost done! We've sent a confirmation link to <b>${esc(em)}</b>. Open it to activate your account. <button class="linkbtn" id="resend" type="button">Resend email</button>`, true); const rs = $("#resend"); if (rs) rs.onclick = async () => { try { await A.resend(em); toast("Confirmation email sent again"); } catch (x) { toast(x.message); } }; }
+        else msg("Account created! Loading your portal…", true);
+      } catch (err) { msg(esc(err.message)); }
+      busy(b, false);
+    };
+    $("#forgot").onclick = () => { show("fforgot"); msg(""); };
+    $("#backsi").onclick = () => { show("fsignin"); msg(""); };
+    $("#fforgot").onsubmit = async e => { e.preventDefault(); const em = $("#fp-email").value, b = e.target.querySelector("[type=submit]"); if (!emailOk(em)) return msg("Please enter a valid email."); busy(b, true, "Sending…"); try { await A.resetPassword(em); msg("If an account exists for that email, a reset link is on its way.", true); } catch (err) { msg(esc(err.message)); } busy(b, false); };
+  }
+
+  P.onboarding = () => {
+    const A = AU(); if (!A || !A.user) { setTimeout(() => location.hash = "login"); return ""; }
+    const p = A.profile || {};
+    return `<section class="band"><div class="wrap" style="max-width:640px"><div class="card"><span class="eyebrow">Welcome to ${B.name}</span><h2>Complete your profile</h2><p class="muted small" style="margin:8px 0 20px">Tell us your board and class so lessons, tests and Nova match your syllabus.</p>
+      <form class="form" id="obf" novalidate><div class="row2"><div class="field"><label for="ob-name">Full name</label><input id="ob-name" value="${esc(p.full_name || "")}" required></div><div class="field"><label for="ob-role">I am a</label><select id="ob-role">${["student", "parent"].map(r => `<option value="${r}" ${p.role === r ? "selected" : ""}>${r[0].toUpperCase() + r.slice(1)}</option>`).join("")}</select></div></div>
+      <div class="row2"><div class="field"><label for="ob-board">Board</label><select id="ob-board">${NS.BOARDS.map(b => `<option value="${b.id}" ${p.board === b.id ? "selected" : ""}>${b.name}</option>`).join("")}</select></div><div class="field"><label for="ob-cls">Class</label><select id="ob-cls">${NS.CLASSES.map(c => `<option ${(p.cls || 8) === c ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>
+      <div class="row2"><div class="field" id="ob-sf"><label for="ob-stream">Stream</label><select id="ob-stream">${Object.keys(NS.STREAMS).map(x => `<option ${p.stream === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label for="ob-lang">Language</label><select id="ob-lang">${["English", "Hindi", "Hinglish"].map(l => `<option ${p.lang === l ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
+      <div class="field"><label for="ob-phone">Mobile (optional)</label><input id="ob-phone" type="tel" inputmode="tel" value="${esc(p.phone || "")}"></div>
+      <div id="oberr" class="err" role="alert"></div><button class="btn btn-blue" type="submit">Save and continue</button></form></div></div></section>`;
+  };
+  P.onboarding.mount = () => {
+    const f = $("#obf"); if (!f) return; const sf = () => $("#ob-sf").style.display = +$("#ob-cls").value >= 11 ? "" : "none"; $("#ob-cls").onchange = sf; sf();
+    f.onsubmit = async e => {
+      e.preventDefault(); const name = $("#ob-name").value.trim(), phone = $("#ob-phone").value.replace(/[\s-]/g, "");
+      if (name.length < 2) { $("#oberr").textContent = "Please enter your name."; return; }
+      if (phone && !/^(\+?91)?[6-9]\d{9}$/.test(phone)) { $("#oberr").textContent = "Please enter a valid 10-digit mobile number, or leave it blank."; return; }
+      const b = f.querySelector("[type=submit]"); b.disabled = true;
+      try { await NS.auth.updateProfile({ full_name: name, role: $("#ob-role").value, board: $("#ob-board").value, cls: +$("#ob-cls").value, stream: +$("#ob-cls").value >= 11 ? $("#ob-stream").value : null, lang: $("#ob-lang").value, phone: phone || null }); toast("Profile saved"); location.hash = NS.auth.afterLogin(); }
+      catch (err) { $("#oberr").textContent = err.message; b.disabled = false; }
+    };
+  };
+  P["reset-password"] = () => `<section class="band"><div class="wrap" style="max-width:520px"><div class="card"><span class="eyebrow">Account security</span><h2>Set a new password</h2><form class="form" id="rpf" style="margin-top:18px" novalidate><div class="field"><label for="rp1">New password</label><input id="rp1" type="password" autocomplete="new-password"></div><div class="field"><label for="rp2">Confirm password</label><input id="rp2" type="password" autocomplete="new-password"></div><div id="rperr" class="err" role="alert"></div><button class="btn btn-blue" type="submit">Update password</button></form></div></div></section>`;
+  P["reset-password"].mount = () => { const f = $("#rpf"); f.onsubmit = async e => { e.preventDefault(); const a = $("#rp1").value, b2 = $("#rp2").value; if (a.length < 8 || !/\d/.test(a)) { $("#rperr").textContent = "Use at least 8 characters including a number."; return; } if (a !== b2) { $("#rperr").textContent = "Passwords don't match."; return; } try { await NS.auth.updatePassword(a); toast("Password updated"); location.hash = "portal"; } catch (err) { $("#rperr").textContent = err.message; } }; };
+
+  /* internal API for the portal module */
+  NS.app = {
+    get S() { return S; }, save, ai, aiErr, md, esc, ic, I, toast, modal, closeModal, copy, startTest, reportText, allCourseStats, last7, planName, PAID, ACH, tqToday, labOpen, logAct, today, inr, choosePlan, onLeave, route, mountTutor, openTutorWith, signOut, tutorRules, renderChrome, LOGO, crumbs,
+    get billing() { return billing; }, set billing(v) { billing = v; }
+  };
+
   /* ---------- boot ---------- */
+  if (AU()) NS.auth.onChange(syncFromAuth);
   renderChrome();
   $("#fab").innerHTML = ic("robot"); $("#fab").onclick = () => $("#drawer").classList.toggle("open");
   mountTutor($("#drawer"), true);
