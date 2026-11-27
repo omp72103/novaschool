@@ -59,7 +59,7 @@
           txt(ctx, String(v[0]), pw - 12, y, C.mute, 11, "right"); y += 22;
         });
       }
-      const ox = W > 520 ? pw : 0, cw = W - ox, px = ox + cw / 2, py = 50, scale = (H - 130) / 2.5;
+      const ox = W > 520 ? pw : 0, cw = W - ox, px = ox + cw / 2, py = 50, scale = Math.max(30, H - 130) / 2.5;
       const bx = px + Math.sin(s.th) * s.L * scale, by = py + Math.cos(s.th) * s.L * scale;
       // stand
       seg(ctx, px - 120, H - 40, px + 60, H - 40, "#8a4b24", 14); seg(ctx, px - 100, H - 46, px - 100, py, "#666", 5); seg(ctx, px - 100, py, px + 10, py, "#666", 5);
