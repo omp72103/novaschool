@@ -88,8 +88,10 @@
   }
 
   /* ---------- plan helpers ---------- */
-  const PAID = () => S.plan === "scholar" || S.plan === "achiever";
-  const ACH = () => S.plan === "achiever";
+  /* admins & teachers get full access to every lab, chapter, test and tool, whatever their plan */
+  const STAFF = () => !!(S.profile && ["admin", "teacher"].includes(S.profile.sysRole));
+  const PAID = () => STAFF() || S.plan === "scholar" || S.plan === "achiever";
+  const ACH = () => STAFF() || S.plan === "achiever";
   const planName = () => NS.PLANS.find(p => p.id === S.plan).name;
   const tqToday = () => S.tq[today()] || 0;
   const canAsk = () => PAID() || tqToday() < 5;
@@ -845,7 +847,7 @@ Return ONLY JSON, no other text: {"questions":[{"q":"question","options":["A","B
 
   /* internal API for the portal module */
   NS.app = {
-    get S() { return S; }, save, ai, aiErr, md, esc, ic, I, toast, modal, closeModal, copy, startTest, reportText, allCourseStats, last7, planName, PAID, ACH, tqToday, labOpen, logAct, today, inr, choosePlan, onLeave, route, mountTutor, openTutorWith, signOut, tutorRules, renderChrome, LOGO, crumbs,
+    get S() { return S; }, STAFF, save, ai, aiErr, md, esc, ic, I, toast, modal, closeModal, copy, startTest, reportText, allCourseStats, last7, planName, PAID, ACH, tqToday, labOpen, logAct, today, inr, choosePlan, onLeave, route, mountTutor, openTutorWith, signOut, tutorRules, renderChrome, LOGO, crumbs,
     get billing() { return billing; }, set billing(v) { billing = v; }
   };
 
